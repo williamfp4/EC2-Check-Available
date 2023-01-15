@@ -26,6 +26,7 @@ def lambda_handler(event, context):
         except Exception as e:
             print("[ERROR]", e)
         print("[INFO] Verification Ended.")
+    return send_metrics()
 
 def check_ebs(volumes, ec2Region):
     global total_volumes
@@ -34,4 +35,26 @@ def check_ebs(volumes, ec2Region):
         if volume['State'] == 'available':
             print("[ALERT] Found Available EBS volume:", volumeId)
             total_volumes += 1
-    print("[EBS] |"+str(total_volumes)+"| available volumes were found")
+
+def send_metrics():
+    global total_volumes
+    try:
+        cloudwatch.put_metric_data(
+                Namespace='LambdaMonitoring',
+                MetricData=[
+                    {
+                        'Dimensions': [
+                            {
+                                'Name': 'Service',
+                                'Value': 'EC2'
+                            },
+                        ],
+                        'MetricName': 'VolumesAvailable',
+                        'Value': total_volumes,
+                        'Unit': 'Count'
+                    }
+                ]
+        )
+        print("[EBS] |"+str(total_volumes+"| available volumes were found")
+    except Exception as e:
+        print("[ERROR] When sending metrics to CloudWatch:", e)
