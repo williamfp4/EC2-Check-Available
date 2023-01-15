@@ -17,15 +17,15 @@ cloudwatch = boto3.client('cloudwatch', region_name=METRICS_REGION)
 total_volumes = 0
 
 def lambda_handler(event, context):
-    for r in regions:
-        print(" [INFO] Starting verification on region:", r)
+    for r in REGIONS:
+        print("[INFO] Starting verification on region:", r)
         try:
             ec2Region = boto3.client('ec2', region_name=r)
             volumes = ec2Region.describe_volumes()
             check_ebs(volumes, ec2Region)
         except Exception as e:
             print("[ERROR]", e)
-        print("[INFO] Verification Ended")
+        print("[INFO] Verification Ended.")
 
 def check_ebs(volumes, ec2Region):
     global total_volumes
