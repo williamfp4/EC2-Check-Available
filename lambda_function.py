@@ -1,0 +1,37 @@
+import json
+import boto3
+import datetime
+
+# Defines the region to which the metrics are going to be exported
+METRICS_REGION = 'sa-east-1'
+
+# Defines which regions are going to be verified
+REGIONS = ['us-east-1', 'sa-east-1']
+
+# Uncomment line 13 if all regions are needed
+# (Don't forget to change Lambda's timeout to at least 30 seconds if so)
+#REGIONS = [region['RegionName'] for region in ec2.describe_regions()['Regions']]
+
+ec2 = boto3.client('ec2')
+cloudwatch = boto3.client('cloudwatch', region_name=METRICS_REGION)
+total_volumes = 0
+
+def lambda_handler(event, context):
+    for r in regions:
+        print(" [INFO] Starting verification on region:", r)
+        try:
+            ec2Region = boto3.client('ec2', region_name=r)
+            volumes = ec2Region.describe_volumes()
+            check_ebs(volumes, ec2Region)
+        except Exception as e:
+            print("[ERROR]", e)
+        print("[INFO] Verification Ended")
+
+def check_ebs(volumes, ec2Region):
+    global total_volumes
+    for volume in volumes['Volumes']:
+        volumeId = volume['VolumeId']
+        if volume['State'] == 'available':
+            print("[ALERT] Found Available EBS volume:", volumeId)
+            total_volumes += 1
+    print("[EBS] |"+str(total_volumes)+"| available volumes were found")
