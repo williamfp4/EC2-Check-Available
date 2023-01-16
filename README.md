@@ -37,7 +37,7 @@ You can use the following JSON code to customize your Function's Role: <br>
     ]
 }
 ```
-<br><br>
+<br>
 
 ## :pencil: Solution Components
 To get this solution up and running, after creating the Lambda Function and assigning it the custom Role, 
@@ -49,4 +49,4 @@ Doing that, the necessary metrics will be set up in CloudWatch.
 After that, you'll only need to set up a Alarms using the newly created metrics, monitoring Available resources every time the code is run. 
 <br>
 
-> [Click here for information on how to set up CloudWatch Alarms](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ConsoleAlarms.html)
+> <a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/ConsoleAlarms.html" target="_blank">Click here for information on how to set up CloudWatch Alarms</a>
