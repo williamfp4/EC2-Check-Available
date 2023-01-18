@@ -15,24 +15,31 @@ REGIONS = ['us-east-1', 'sa-east-1']
 ec2 = boto3.client('ec2')
 cloudwatch = boto3.client('cloudwatch', region_name=METRICS_REGION)
 total_volumes = 0
+ebs_tags = []
 
 def lambda_handler(event, context):
+    # Change the value to False if checking for EBS Volumes without tags isn't needed
+    debug_tags = False
     for r in REGIONS:
         print("[INFO] Starting verification on region:", r)
         try:
             ec2Region = boto3.client('ec2', region_name=r)
             volumes = ec2Region.describe_volumes()
             check_ebs(volumes, ec2Region)
+            search_null(debug_tags, ebs_tags)
         except Exception as e:
             print("[ERROR]", e)
         print("[INFO] Verification Ended.")
-    return send_metrics()
+    return send_metrics(total_volumes, total_eips)
 
 def check_ebs(volumes, ec2Region):
     global total_volumes
+    global ebs_tags
     for volume in volumes['Volumes']:
         volumeId = volume['VolumeId']
-        if volume['State'] == 'available':
+        if volume['State'] == 'available' and 'Tags' not in volume:
+            ebs_tags.append("[WARN] Found EBS Volume without Tags: "+str(volumeId))
+        elif volume['State'] == 'available':
             print("[ALERT] Found Available EBS volume:", volumeId)
             total_volumes += 1
 
@@ -58,3 +65,10 @@ def send_metrics():
         print("[EBS] |"+str(total_volumes+"| available volumes were found")
     except Exception as e:
         print("[ERROR] When sending metrics to CloudWatch:", e)
+
+def search_null(debug_tags, ebs_tags):
+    if debug_tags == True:
+        for v in ebs_tags:
+            print(v)
+        print('\n')
+        print("[EBS] Found |"+str(len(ebs_tags))+"| volumes without tags")
