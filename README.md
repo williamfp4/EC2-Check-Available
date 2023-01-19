@@ -16,7 +16,9 @@ You can use the following JSON code to customize your Function's Role: <br>
                 "cloudwatch:PutMetricData",
                 "ec2:DescribeInstances",
                 "ec2:DescribeRegions",
-                "ec2:DescribeVolumes"
+                "ec2:DescribeVolumes",
+                "ec2:DescribeAddresses",
+                "ec2:CreateTags"
             ],
             "Resource": [
                 "*"
