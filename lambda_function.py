@@ -13,58 +13,124 @@ REGIONS = ['us-east-1', 'sa-east-1']
 #REGIONS = [region['RegionName'] for region in ec2.describe_regions()['Regions']]
 
 ec2 = boto3.client('ec2')
+ec2Region = 0
 cloudwatch = boto3.client('cloudwatch', region_name=METRICS_REGION)
 total_volumes = 0
+total_eips = 0
 ebs_tags = []
+eip_tags = []
 
 def lambda_handler(event, context):
     # Change the value to False if checking for EBS Volumes without tags isn't needed
     debug_tags = False
+    global ec2Region
     for r in REGIONS:
         print("[INFO] Starting verification on region:", r)
         try:
             ec2Region = boto3.client('ec2', region_name=r)
             volumes = ec2Region.describe_volumes()
-            check_ebs(volumes, ec2Region)
-            search_null(debug_tags, ebs_tags)
+            eips = ec2Region.describe_addresses()
+            check_ebs(volumes)
+            check_eips(eips)
+            search_null(debug_tags, ebs_tags, eip_tags)
         except Exception as e:
             print("[ERROR]", e)
         print("[INFO] Verification Ended.")
-    return send_metrics(total_volumes, total_eips)
+    return send_metrics()
 
-def check_ebs(volumes, ec2Region):
-    global total_volumes
-    global ebs_tags
+def check_ebs(volumes):
+    global total_volumes, ebs_tags, ec2Region
     for volume in volumes['Volumes']:
+        checked = False
         volumeId = volume['VolumeId']
-        if volume['State'] == 'available' and 'Tags' not in volume:
+        if 'Tags' in volume:
+            for tag in volume['Tags']:
+                if 'ebs_available' in tag.values():
+                    checked = True
+        elif volume['State'] == 'available' and 'Tags' not in volume:
             ebs_tags.append("[WARN] Found EBS Volume without Tags: "+str(volumeId))
-        elif volume['State'] == 'available':
+            checked = True
+        if volume['State'] == 'available' and checked == False:
             print("[ALERT] Found Available EBS volume:", volumeId)
+            response = ec2Region.create_tags(
+                Resources=[
+                    volumeId,
+                ],
+                Tags=[
+                    {
+                        'Key': 'ebs_available',
+                        'Value': datetime.datetime.now().strftime("%d/%m/%y - %H:%M"),
+                    },
+                ],
+            )
             total_volumes += 1
 
+def check_eips(eips):
+    global total_eips, eip_tags, ec2Region
+    for eip in eips['Addresses']:
+        checked = False
+        if 'Tags' in eip:
+            for tag in eip['Tags']:
+                if 'eip_available' in tag.values():
+                    checked = True
+        elif 'AssociationId' in eip.keys() and 'Tags' not in eip:
+            eip_tags.append("[WARN] Found EIP Address without Tags: "+str(eip['AllocationId']))
+            checked = True
+        if 'AssociationId' not in eip.keys() and checked == False:
+            print("[ALERT] Found EIP not in use:", eip['AllocationId'])
+            response = ec2Region.create_tags(
+                Resources=[
+                    eip['AllocationId'],
+                ],
+                Tags=[
+                    {
+                        'Key': 'eip_available',
+                        'Value': datetime.datetime.now().strftime("%d/%m/%y - %H:%M"),
+                    },
+                ],
+            )
+            total_eips += 1
+
 def send_metrics():
-    global total_volumes
+    global total_volumes, total_eips
     try:
         cloudwatch.put_metric_data(
-                Namespace='LambdaMonitoring',
-                MetricData=[
-                    {
-                        'Dimensions': [
-                            {
-                                'Name': 'Service',
-                                'Value': 'EC2'
-                            },
-                        ],
-                        'MetricName': 'VolumesAvailable',
-                        'Value': total_volumes,
-                        'Unit': 'Count'
-                    }
-                ]
+            Namespace='LambdaMonitoring',
+            MetricData=[
+                {
+                    'Dimensions': [
+                        {
+                            'Name': 'Service',
+                            'Value': 'EC2'
+                        },
+                    ],
+                    'MetricName': 'VolumesAvailable',
+                    'Value': total_volumes,
+                    'Unit': 'Count'
+                }
+            ]
         )
-        print("[EBS] |"+str(total_volumes+"| available volumes were found")
+        print("[EBS] |"+str(total_volumes)+"| available volumes were found")
+
+        cloudwatch.put_metric_data(
+            Namespace='LambdaMonitoring',
+            MetricData=[
+                {
+                    'Dimensions': [
+                        {
+                            'Name': 'Service',
+                            'Value': 'EC2'
+                            },
+                    ],
+                    'MetricName': 'UnusedEIPs',
+                    'Value': total_eips,
+                    'Unit': 'Count'
+                }
+            ]
+        )
+        print("[EIP] |"+str(total_eips)+"| eips not in use found")
     except Exception as e:
-        print("[ERROR] When sending metrics to CloudWatch:", e)
+        print("[ERROR] When sending metrics to CloudWatch: "+str(e))
 
 def search_null(debug_tags, ebs_tags):
     if debug_tags == True:
