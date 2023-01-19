@@ -22,7 +22,7 @@ eip_tags = []
 
 def lambda_handler(event, context):
     # Change the value to False if checking for EBS Volumes without tags isn't needed
-    debug_tags = False
+    debug_tags = True
     global ec2Region
     for r in REGIONS:
         print("[INFO] Starting verification on region:", r)
@@ -32,7 +32,7 @@ def lambda_handler(event, context):
             eips = ec2Region.describe_addresses()
             check_ebs(volumes)
             check_eips(eips)
-            search_null(debug_tags, ebs_tags, eip_tags)
+            search_null(debug_tags)
         except Exception as e:
             print("[ERROR]", e)
         print("[INFO] Verification Ended.")
@@ -90,6 +90,7 @@ def check_eips(eips):
                 ],
             )
             total_eips += 1
+        print(checked)
 
 def send_metrics():
     global total_volumes, total_eips
@@ -132,7 +133,8 @@ def send_metrics():
     except Exception as e:
         print("[ERROR] When sending metrics to CloudWatch: "+str(e))
 
-def search_null(debug_tags, ebs_tags, eip_tags):
+def search_null(debug_tags):
+    global ebs_tags, eip_tags
     if debug_tags == True:
         for v in ebs_tags:
             print(v)
