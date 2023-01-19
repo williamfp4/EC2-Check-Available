@@ -132,9 +132,13 @@ def send_metrics():
     except Exception as e:
         print("[ERROR] When sending metrics to CloudWatch: "+str(e))
 
-def search_null(debug_tags, ebs_tags):
+def search_null(debug_tags, ebs_tags, eip_tags):
     if debug_tags == True:
         for v in ebs_tags:
             print(v)
-        print('\n')
+        print("\n")
+        for ip in eip_tags:
+            print(ip)
+        print("\n")
         print("[EBS] Found |"+str(len(ebs_tags))+"| volumes without tags")
+        print("[EIP] Found |"+str(len(eip_tags))+"| addresses without tags")
