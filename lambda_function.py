@@ -90,7 +90,6 @@ def check_eips(eips):
                 ],
             )
             total_eips += 1
-        print(checked)
 
 def send_metrics():
     global total_volumes, total_eips
