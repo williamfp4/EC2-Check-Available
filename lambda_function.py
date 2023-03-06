@@ -17,6 +17,7 @@ ec2Region = 0
 cloudwatch = boto3.client('cloudwatch', region_name=METRICS_REGION)
 total_volumes = 0
 total_eips = 0
+total_snapshots = 0
 ebs_tags = []
 eip_tags = []
 
@@ -29,8 +30,12 @@ def lambda_handler(event, context):
         try:
             ec2Region = boto3.client('ec2', region_name=r)
             volumes = ec2Region.describe_volumes()
+            snapshots = ec2Region.describe_snapshots(
+                OwnerIds=['301676479058']
+            )
             eips = ec2Region.describe_addresses()
             check_ebs(volumes)
+            check_snapshots(snapshots)
             check_eips(eips)
             search_null(debug_tags)
         except Exception as e:
@@ -92,7 +97,7 @@ def check_eips(eips):
             total_eips += 1
 
 def send_metrics():
-    global total_volumes, total_eips
+    global total_volumes, total_eips, total_snapshots
     try:
         cloudwatch.put_metric_data(
             Namespace='LambdaMonitoring',
@@ -129,6 +134,7 @@ def send_metrics():
             ]
         )
         print("[EIP] |"+str(total_eips)+"| eips not in use found")
+        print("[SNAPS] |"+str(total_snapshots)+"| snapshots without volume")
     except Exception as e:
         print("[ERROR] When sending metrics to CloudWatch: "+str(e))
 
@@ -143,3 +149,28 @@ def search_null(debug_tags):
         print("\n")
         print("[EBS] Found |"+str(len(ebs_tags))+"| volumes without tags")
         print("[EIP] Found |"+str(len(eip_tags))+"| addresses without tags")
+        
+def check_snapshots(snapshots):
+    global total_snapshots, ec2Region
+    deleted = False
+    
+    for s in snapshots['Snapshots']:
+        try:
+            vol = ec2Region.describe_volumes(
+                    VolumeIds=[s['VolumeId']]
+            )
+            deleted = False
+        except:
+            deleted = True
+            total_snapshots += 1
+        if deleted != False and :
+            response = ec2Region.create_tags(
+                Resources=[s['SnapshotId']],
+                Tags=[
+                    {
+                        'Key': 'nullVolume',
+                        'Value': datetime.datetime.now().strftime("%d/%m/%y - %H:%M")
+                    },
+                ]
+            )
+    print("[ALERT] Snapshots without volumes were tagged")
